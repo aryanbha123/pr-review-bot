@@ -1,0 +1,16 @@
+# local config and secrets
+settings.json
+.env
+.install
+
+# runtime data
+state.json
+history.jsonl
+logs/
+runs/
+worktrees/
+clones/
+.lock/
+.last_run
+*.new
+*.tmp.*

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>@LABEL@</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>@BOT_DIR@/poll.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>30</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>WorkingDirectory</key>
+  <string>@BOT_DIR@</string>
+  <!-- launchd does not read shell profiles; install.sh records where the CLIs live. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>@PATH@</string>
+    <key>HOME</key>
+    <string>@HOME@</string>
+    <key>LANG</key>
+    <string>en_US.UTF-8</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>@BOT_DIR@/logs/launchd.out</string>
+  <key>StandardErrorPath</key>
+  <string>@BOT_DIR@/logs/launchd.err</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>

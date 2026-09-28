@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR Review Bot</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f0f2f5; --border: #e3e6eb;
+    --ink: #16181d; --ink-2: #4a505c; --ink-3: #7c8390;
+    --accent: #3b5bdb;
+    --good: #2b8a3e; --good-bg: #e6f4ea;
+    --warn: #b35c00; --warn-bg: #fff1e0;
+    --crit: #c92a2a; --crit-bg: #fdecec;
+    --minor: #8a6d00; --minor-bg: #fff8d6;
+    --idle: #7c8390; --idle-bg: #eef0f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --border: #2a2f39;
+      --ink: #e8eaee; --ink-2: #b3b9c4; --ink-3: #7f8794;
+      --accent: #7c9cff;
+      --good: #6fcf86; --good-bg: #16301f;
+      --warn: #ffb259; --warn-bg: #362511;
+      --crit: #ff7b7b; --crit-bg: #3a1717;
+      --minor: #e8c85a; --minor-bg: #332b0f;
+      --idle: #8b93a1; --idle-bg: #232730;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --border: #2a2f39;
+    --ink: #e8eaee; --ink-2: #b3b9c4; --ink-3: #7f8794;
+    --accent: #7c9cff;
+    --good: #6fcf86; --good-bg: #16301f;
+    --warn: #ffb259; --warn-bg: #362511;
+    --crit: #ff7b7b; --crit-bg: #3a1717;
+    --minor: #e8c85a; --minor-bg: #332b0f;
+    --idle: #8b93a1; --idle-bg: #232730;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-3); font-size: 13px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--idle); vertical-align: 1px; }
+  .dot.live { background: var(--good); }
+  .dot.busy { background: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
+  .dot.down { background: var(--crit); }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .tile .k { color: var(--ink-3); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .tile .v { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .d { color: var(--ink-2); font-size: 12.5px; margin-top: 4px; }
+  .tile.save .v { color: var(--good); }
+
+  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; margin: -8px 0 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .compare div { padding: 10px 16px; border-right: 1px solid var(--border); font-size: 13px; color: var(--ink-2); }
+  .compare div:last-child { border-right: 0; }
+  .compare b { color: var(--ink); font-weight: 600; }
+  .compare .s { color: var(--good); font-weight: 650; }
+  .note { color: var(--ink-3); font-size: 12px; margin: -12px 0 20px; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .bar h2 { font-size: 15px; margin: 0 auto 0 0; font-weight: 650; }
+  select, button {
+    font: inherit; font-size: 13px; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px;
+  }
+  button { cursor: pointer; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; font-weight: 600; color: var(--ink-3); background: var(--surface-2); white-space: nowrap; }
+  tr.row { cursor: pointer; }
+  tr.row:hover td { background: var(--surface-2); }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  td.nowrap { white-space: nowrap; }
+  .title { color: var(--ink); }
+  .muted { color: var(--ink-3); }
+  .small { font-size: 12.5px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .b-good { color: var(--good); background: var(--good-bg); }
+  .b-warn { color: var(--warn); background: var(--warn-bg); }
+  .b-crit { color: var(--crit); background: var(--crit-bg); }
+  .b-idle { color: var(--idle); background: var(--idle-bg); }
+  .sev { white-space: nowrap; font-size: 12.5px; }
+  .sev span + span { margin-left: 8px; }
+  tr.detail td { background: var(--surface-2); padding: 12px 16px 16px; }
+  .detail p { margin: 0 0 10px; color: var(--ink-2); max-width: 90ch; }
+  .detail ul { margin: 0; padding-left: 18px; }
+  .detail li { margin: 4px 0; }
+  code { font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+  .empty { padding: 28px; text-align: center; color: var(--ink-3); }
+
+  details.log { margin-top: 20px; }
+  details.log summary { cursor: pointer; font-weight: 650; font-size: 15px; margin-bottom: 10px; }
+  pre { margin: 0; padding: 12px 14px; font: 12px/1.55 ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto; }
+  .err { color: var(--crit); }
+
+  .hbtn { margin-left: auto; }
+  #settings { display: none; margin-bottom: 24px; }
+  #settings.open { display: block; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .panel h3 { margin: 0 0 4px; font-size: 14px; font-weight: 650; }
+  .panel .hint { color: var(--ink-3); font-size: 12.5px; margin: 0 0 12px; }
+  .engines { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .engine { border: 1px solid var(--border); border-radius: 9px; padding: 12px; cursor: pointer; display: block; }
+  .engine.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .engine .name { font-weight: 650; display: flex; align-items: center; gap: 8px; }
+  .engine .meta { color: var(--ink-3); font-size: 12px; margin: 4px 0 10px; min-height: 16px; }
+  .field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-2); min-width: 0; }
+  .field input, .field textarea, .field select { width: 100%; }
+  input[type=text], input[type=password], input[type=number], textarea {
+    font: inherit; font-size: 13px; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; min-width: 0;
+  }
+  textarea { min-height: 60px; resize: vertical; font-size: 12.5px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 14px; }
+  .row-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .keyrow { display: grid; grid-template-columns: 170px 1fr auto auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .keyrow .kn { font-size: 12.5px; color: var(--ink-2); }
+  .repo { border: 1px solid var(--border); border-radius: 9px; padding: 10px; margin-bottom: 8px; }
+  .repo .grid2 { grid-template-columns: 1fr 1.4fr auto; align-items: end; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  button.ghost { background: transparent; }
+  .msg { font-size: 12.5px; }
+  .msg.ok { color: var(--good); } .msg.bad { color: var(--crit); }
+  .check { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink); }
+  .warn-box { color: var(--warn); font-size: 12.5px; }
+  .savebar { position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  @media (max-width: 720px) { .keyrow { grid-template-columns: 1fr; } .repo .grid2 { grid-template-columns: 1fr; } }
+
+  @media (max-width: 720px) {
+    .hide-sm { display: none; }
+    .tile .v { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span id="hdot" class="dot"></span>PR Review Bot</h1>
+    <span class="sub" id="hsub">loading…</span>
+    <button class="hbtn" id="toggleSettings" type="button">⚙ Settings</button>
+  </header>
+
+  <section id="settings" aria-label="Settings">
+    <div class="panel">
+      <h3>Review engine</h3>
+      <p class="hint">Which CLI reviews the PRs. Each runs headless and read-only inside the PR worktree. Leave the model empty to use the CLI's default.</p>
+      <div class="engines" id="engines"></div>
+    </div>
+
+    <div class="panel">
+      <h3>API keys</h3>
+      <p class="hint">Stored in <code>.env</code> in the bot folder (chmod 600, gitignored), and never sent back to this page. Leave a key empty to use that CLI's own login (claude.ai, ChatGPT or Google). Each engine only receives its own key.</p>
+      <div id="keys"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Repositories</h3>
+      <p class="hint">Local path is optional: leave it empty and the bot keeps its own lightweight clone. Your working copy is never checked out or modified either way. Extra rules are appended to the review prompt for that repo.</p>
+      <div id="repos"></div>
+      <button type="button" id="addRepo">+ Add repository</button>
+    </div>
+
+    <div class="panel">
+      <h3>Behaviour</h3>
+      <div class="grid2">
+        <label class="check"><input type="checkbox" id="sPost"> Post reviews on GitHub</label>
+        <label class="check"><input type="checkbox" id="sDrafts"> Skip draft PRs</label>
+        <label class="check"><input type="checkbox" id="sBots"> Skip PRs by bots</label>
+        <label class="field">Skip label <input type="text" id="sLabel" placeholder="no-review"></label>
+        <label class="field">Skip authors (comma separated) <input type="text" id="sAuthors" placeholder="dependabot, renovate"></label>
+        <label class="field">Max turns per review <input type="number" id="sTurns" min="5" max="300"></label>
+        <label class="field">Review timeout (seconds) <input type="number" id="sTimeout" min="120" max="3600"></label>
+        <label class="field">Keep logs (days) <input type="number" id="sRetention" min="1" max="90"></label>
+      </div>
+      <p class="warn-box" id="postWarn" style="margin:10px 0 0"></p>
+    </div>
+
+    <div class="panel">
+      <h3>Price comparison</h3>
+      <p class="hint">Per-developer monthly prices used for the "saved" figures. The first entry is the headline tile.</p>
+      <div id="compareEdit"></div>
+      <button type="button" id="addCompare">+ Add tool</button>
+    </div>
+
+    <div class="savebar">
+      <button type="button" class="primary" id="saveSettings">Save settings</button>
+      <button type="button" class="ghost" id="closeSettings">Close</button>
+      <span class="msg" id="settingsMsg"></span>
+    </div>
+  </section>
+
+  <section class="tiles" id="tiles"></section>
+  <section class="compare" id="compare"></section>
+  <p class="note" id="compareNote"></p>
+
+  <div class="bar">
+    <h2>Reviews</h2>
+    <select id="fRepo" aria-label="Repository"><option value="">All repos</option></select>
+    <select id="fVerdict" aria-label="Verdict">
+      <option value="">All verdicts</option>
+      <option value="BLOCKING">Blocking</option>
+      <option value="NEEDS_CHANGES">Needs changes</option>
+      <option value="LGTM">LGTM</option>
+      <option value="failed">Failed</option>
+    </select>
+    <button id="refresh" type="button">Refresh</button>
+  </div>
+  <div class="card scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>When</th><th>PR</th><th>Title</th><th class="hide-sm">Author</th>
+          <th>Verdict</th><th>Issues</th><th class="hide-sm">Model</th>
+          <th class="num hide-sm">Time</th><th class="num" title="API list-price equivalent. With a claude.ai subscription this is not billed; it counts against plan usage.">API-equiv.</th>
+        </tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <details class="log" id="logBox">
+    <summary>Today's log</summary>
+    <div class="card"><pre id="log"></pre></div>
+  </details>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (n) => "$" + (Number(n) || 0).toFixed(2);
+const open = new Set();
+let data = null;
+
+function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+
+function ago(iso) {
+  const t = Date.parse(iso.includes("T") ? iso : iso.replace(" ", "T"));
+  if (isNaN(t)) return iso;
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return Math.round(s) + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return Math.round(s / 86400) + "d ago";
+}
+function dur(ms) {
+  if (!ms) return "";
+  const s = Math.round(ms / 1000);
+  return s < 60 ? s + "s" : Math.floor(s / 60) + "m " + String(s % 60).padStart(2, "0") + "s";
+}
+function localTime(iso) { const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString(); }
+
+function verdictBadge(h) {
+  if (h.status === "failed") return '<span class="badge b-idle">⚠ Failed' + (h.attempt ? " (" + h.attempt + "/3)" : "") + "</span>";
+  return {
+    BLOCKING: '<span class="badge b-crit">⛔ Blocking</span>',
+    NEEDS_CHANGES: '<span class="badge b-warn">▲ Needs changes</span>',
+    LGTM: '<span class="badge b-good">✓ LGTM</span>',
+  }[h.verdict] || esc(h.verdict);
+}
+function sevCounts(issues) {
+  if (!issues) return "";
+  const c = { critical: 0, major: 0, minor: 0 };
+  issues.forEach((i) => c[i.severity]++);
+  const parts = [];
+  if (c.critical) parts.push("<span>🔴 " + c.critical + "</span>");
+  if (c.major) parts.push("<span>🟠 " + c.major + "</span>");
+  if (c.minor) parts.push("<span>🟡 " + c.minor + "</span>");
+  return parts.length ? '<span class="sev">' + parts.join("") + "</span>" : '<span class="muted small">none</span>';
+}
+const shortModel = (m) => (m || "").replace(/^claude-/, "");
+const shortRepo = (r) => (r || "").split("/").pop();
+
+function renderTiles(d) {
+  const a = d.agent;
+  let agentV, agentD, dot;
+  if (!a.loaded) { agentV = "Not loaded"; agentD = "launchctl bootstrap to start"; dot = "down"; }
+  else if (d.current) { agentV = "Reviewing"; agentD = "tick #" + a.runs + " · exit " + (a.last_exit || "–"); dot = "busy"; }
+  else { agentV = "Watching"; agentD = "last tick " + ago(a.last_tick) + " · exit " + (a.last_exit || "–"); dot = "live"; }
+  $("hdot").className = "dot " + dot;
+  $("hsub").textContent = d.engine + (d.model ? " · " + shortModel(d.model) : "") + " · posting " + (d.posting ? "on" : "off (shadow mode)") + " · " + d.repos.map(shortRepo).join(", ") + " · updated " + new Date().toLocaleTimeString();
+
+  const cur = d.current
+    ? { v: '<a href="https://github.com/' + esc(d.current.key.replace("#", "/pull/")) + '" target="_blank" rel="noopener">' + esc(shortRepo(d.current.key.split("#")[0])) + " #" + esc(d.current.key.split("#")[1]) + "</a>",
+        dd: "started " + ago(d.current.since) + " · " + esc(d.current.sha) }
+    : { v: '<span class="muted">Idle</span>', dd: "next PR or push is picked up within 30s" };
+  const mix = (t) => "⛔ " + t.blocking + " · ▲ " + t.needs_changes + " · ✓ " + t.lgtm;
+
+  const m = d.month, top = m.compare[0];
+  const monthName = new Date(m.month + "-01T00:00:00Z").toLocaleString(undefined, { month: "short", timeZone: "UTC" });
+  const round = (n) => "$" + Math.round(n).toLocaleString();
+  const saveTile = top
+    ? ["Saved vs " + esc(top.name) + " (" + monthName + ")", round(top.saved_usd),
+       m.devs.length + " devs × $" + top.seat_usd + " − " + money(m.our_cost_usd) + " API-equiv."]
+    : null;
+  $("compare").innerHTML = m.compare.map((c) =>
+    '<div><b>' + esc(c.name) + '</b> $' + c.seat_usd + '/dev<br>' + round(c.their_cost_usd) + ' vs ' + money(m.our_cost_usd) +
+    ' · <span class="s">saves ' + round(c.saved_usd) + '</span></div>').join("");
+  $("compareNote").textContent = "This month: " + m.reviews + " reviews for " + m.devs.length + " developers (" + m.devs.join(", ") +
+    "). Seat prices are annual-billing list prices, charged per developer who opens PRs. API-equiv. is list-price token cost; on a Claude subscription the bot adds no bill.";
+
+  $("tiles").innerHTML = [
+    ...(saveTile ? [saveTile] : []),
+    ["Agent", esc(agentV), esc(agentD)],
+    ["Now reviewing", cur.v, cur.dd],
+    ["Today (UTC)", d.today.reviews + " reviews", money(d.today.cost_usd) + " API-equiv. · " + mix(d.today)],
+    ["Last 7 days", d.week.reviews + " reviews", money(d.week.cost_usd) + " API-equiv. · " + mix(d.week)],
+    ["All time", d.all.reviews + " reviews", d.seen + " PR heads tracked"],
+  ].map(([k, v, dd], i) => '<div class="tile' + (saveTile && i === 0 ? " save" : "") + '"><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="d" title="' + esc(dd.replace(/<[^>]+>/g, "")) + '">' + dd + "</div></div>").join("");
+}
+
+function renderRows(d) {
+  const repoSel = $("fRepo");
+  if (repoSel.options.length === 1) {
+    d.repos.forEach((r) => repoSel.add(new Option(shortRepo(r), r)));
+    repoSel.value = load("prbot.repo");
+  }
+  const fr = repoSel.value, fv = $("fVerdict").value;
+  const list = d.history.filter((h) => (!fr || h.repo === fr) && (!fv || (fv === "failed" ? h.status === "failed" : h.verdict === fv)));
+  if (!list.length) { $("rows").innerHTML = '<tr><td colspan="9" class="empty">No reviews match.</td></tr>'; return; }
+
+  $("rows").innerHTML = list.map((h) => {
+    const id = h.repo + "#" + h.pr + "@" + h.sha;
+    const prLink = '<a href="' + esc(h.pr_url || "https://github.com/" + h.repo + "/pull/" + h.pr) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(shortRepo(h.repo)) + " #" + h.pr + "</a>";
+    let row = '<tr class="row" data-id="' + esc(id) + '">' +
+      '<td class="nowrap" title="' + esc(localTime(h.at)) + '">' + ago(h.at) + "</td>" +
+      '<td class="nowrap">' + prLink + "</td>" +
+      '<td class="title">' + esc(h.title || (h.status === "failed" ? "commit " + h.sha.slice(0, 12) : "")) + "</td>" +
+      '<td class="hide-sm muted small">' + esc(h.author || "") + "</td>" +
+      "<td>" + verdictBadge(h) + "</td>" +
+      "<td>" + sevCounts(h.issues) + "</td>" +
+      '<td class="hide-sm muted small nowrap">' + esc(shortModel(h.model)) + "</td>" +
+      '<td class="num hide-sm muted small">' + dur(h.duration_ms) + "</td>" +
+      '<td class="num small">' + (h.cost_usd != null ? money(h.cost_usd) : "") + "</td></tr>";
+    if (open.has(id)) {
+      const issues = (h.issues || []).map((i) =>
+        "<li>" + ({ critical: "🔴", major: "🟠", minor: "🟡" }[i.severity] || "") + " <strong>" + esc(i.title) + "</strong> <code>" +
+        esc(i.file + (i.line ? ":" + i.line : "")) + '</code> <span class="muted small">' + esc(i.category) + "</span></li>").join("");
+      row += '<tr class="detail"><td colspan="9"><div class="detail">' +
+        (h.status === "failed"
+          ? "<p>Review of commit <code>" + esc(h.sha.slice(0, 12)) + "</code> failed (attempt " + h.attempt + "/3). See today's log below.</p>"
+          : "<p>" + esc(h.summary) + "</p>" + (issues ? "<ul>" + issues + "</ul>" : "") +
+            '<p style="margin-top:10px"><a href="' + esc(h.review_url) + '" target="_blank" rel="noopener">Open review on GitHub →</a> <span class="muted small">· commit ' + esc(h.sha.slice(0, 12)) + " · " + (h.turns || "?") + " turns</span></p>") +
+        "</div></td></tr>";
+    }
+    return row;
+  }).join("");
+}
+
+function renderLog(d) {
+  $("log").innerHTML = d.log.map((l) => {
+    const e = esc(l);
+    return /ERROR|failed/.test(l) ? '<span class="err">' + e + "</span>" : e;
+  }).join("\n") || "No activity yet today.";
+}
+
+async function refresh() {
+  try {
+    const r = await fetch("/api/status", { cache: "no-store" });
+    data = await r.json();
+    renderTiles(data); renderRows(data); renderLog(data);
+  } catch (e) {
+    $("hdot").className = "dot down";
+    $("hsub").textContent = "could not load /api/status: " + e.message;
+  }
+}
+
+$("rows").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr.row");
+  if (!tr) return;
+  const id = tr.dataset.id;
+  open.has(id) ? open.delete(id) : open.add(id);
+  if (data) renderRows(data);
+});
+$("fRepo").addEventListener("change", () => { store("prbot.repo", $("fRepo").value); data && renderRows(data); });
+$("fVerdict").addEventListener("change", () => data && renderRows(data));
+$("refresh").addEventListener("click", refresh);
+$("logBox").open = load("prbot.log") === "1";
+$("logBox").addEventListener("toggle", () => store("prbot.log", $("logBox").open ? "1" : "0"));
+
+/* ---------------- settings ---------------- */
+const MODEL_HINTS = {
+  claude: ["claude-opus-5-5", "claude-sonnet-5", "claude-fable-5-1", "claude-haiku-4-5-20251001"],
+  codex: [], gemini: [],
+};
+const ENGINE_INFO = {
+  claude: { label: "Claude Code", key: "ANTHROPIC_API_KEY", install: "npm i -g @anthropic-ai/claude-code" },
+  codex: { label: "OpenAI Codex", key: "OPENAI_API_KEY", install: "npm i -g @openai/codex" },
+  gemini: { label: "Gemini CLI", key: "GEMINI_API_KEY", install: "npm i -g @google/gemini-cli" },
+};
+let cfg = null;
+
+async function post(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-PRBot": "1" }, body: JSON.stringify(body) });
+  return r.json();
+}
+function setMsg(el, res) {
+  el.className = "msg " + (res.ok ? "ok" : "bad");
+  el.textContent = res.ok ? res.message : res.error;
+}
+
+async function loadSettings() {
+  cfg = await (await fetch("/api/settings", { cache: "no-store" })).json();
+  const s = cfg.settings;
+  // engines
+  $("engines").innerHTML = Object.keys(ENGINE_INFO).map((e) => {
+    const info = ENGINE_INFO[e], inst = cfg.engines[e] || {}, key = cfg.keys[info.key] || {};
+    const hints = MODEL_HINTS[e].map((m) => '<option value="' + m + '">').join("");
+    return '<label class="engine' + (s.engine === e ? " sel" : "") + '" data-engine="' + e + '">' +
+      '<span class="name"><input type="radio" name="engine" value="' + e + '"' + (s.engine === e ? " checked" : "") + (inst.installed ? "" : " disabled") + "> " + info.label + "</span>" +
+      '<div class="meta">' + (inst.installed ? esc(inst.version || "installed") : "not installed: <code>" + info.install + "</code>") +
+      " · " + (key.set ? "API key " + esc(key.masked) : "uses CLI login") + "</div>" +
+      '<div class="field">Model<input type="text" data-model="' + e + '" list="hints-' + e + '" value="' + esc((s.models || {})[e] || "") + '" placeholder="CLI default"><datalist id="hints-' + e + '">' + hints + "</datalist></div>" +
+      '<div class="row-inline" style="margin-top:8px"><button type="button" data-test="' + e + '"' + (inst.installed ? "" : " disabled") + '>Test</button><span class="msg" id="test-' + e + '"></span></div>' +
+      "</label>";
+  }).join("");
+  // keys
+  $("keys").innerHTML = Object.keys(ENGINE_INFO).map((e) => {
+    const k = ENGINE_INFO[e].key, st = cfg.keys[k] || {};
+    return '<div class="keyrow"><span class="kn">' + k + '<br><span class="muted">' + (st.set ? "set: " + esc(st.masked) : "not set") + "</span></span>" +
+      '<input type="password" autocomplete="off" data-key="' + k + '" placeholder="paste a new key">' +
+      '<button type="button" data-savekey="' + k + '">Save</button>' +
+      '<button type="button" class="ghost" data-delkey="' + k + '"' + (st.set ? "" : " disabled") + ">Remove</button></div>";
+  }).join("") + '<span class="msg" id="keyMsg"></span>';
+  // repos
+  renderRepoRows(s.repos || []);
+  // behaviour
+  $("sPost").checked = !!s.post_comments;
+  $("sDrafts").checked = s.skip?.drafts !== false;
+  $("sBots").checked = s.skip?.bots !== false;
+  $("sLabel").value = s.skip?.label || "";
+  $("sAuthors").value = (s.skip?.authors || []).join(", ");
+  $("sTurns").value = s.max_turns;
+  $("sTimeout").value = s.review_timeout;
+  $("sRetention").value = s.log_retention_days;
+  renderCompareRows(s.compare || []);
+  postWarn();
+}
+
+function renderRepoRows(repos) {
+  $("repos").innerHTML = repos.map((r, i) =>
+    '<div class="repo" data-i="' + i + '"><div class="grid2">' +
+    '<label class="field">owner/repo<input type="text" data-f="repo" value="' + esc(r.repo) + '" placeholder="acme/web"></label>' +
+    '<label class="field">Local clone path (optional)<input type="text" data-f="path" value="' + esc(r.path || "") + '" placeholder="~/code/web"></label>' +
+    '<button type="button" class="ghost" data-delrepo="' + i + '">Remove</button></div>' +
+    '<label class="field" style="margin-top:8px">Extra rules for this repo (optional)<textarea data-f="rules" placeholder="e.g. apps/web and apps/admin share components; check both copies.">' + esc(r.rules || "") + "</textarea></label></div>"
+  ).join("") || '<p class="hint">No repositories yet.</p>';
+}
+function readRepoRows() {
+  return [...document.querySelectorAll("#repos .repo")].map((el) => ({
+    repo: el.querySelector('[data-f="repo"]').value.trim(),
+    path: el.querySelector('[data-f="path"]').value.trim(),
+    rules: el.querySelector('[data-f="rules"]').value,
+  })).filter((r) => r.repo);
+}
+function renderCompareRows(list) {
+  $("compareEdit").innerHTML = list.map((c, i) =>
+    '<div class="row-inline" style="margin-bottom:8px" data-ci="' + i + '"><input type="text" data-c="name" value="' + esc(c.name) + '" placeholder="Tool and plan">' +
+    '<input type="number" data-c="seat" value="' + c.seat_usd + '" min="0" step="1" style="width:110px" aria-label="USD per developer per month"> $/dev/month ' +
+    '<button type="button" class="ghost" data-delcmp="' + i + '">Remove</button></div>').join("");
+}
+function readCompareRows() {
+  return [...document.querySelectorAll("#compareEdit [data-ci]")].map((el) => ({
+    name: el.querySelector('[data-c="name"]').value.trim(),
+    seat_usd: Number(el.querySelector('[data-c="seat"]').value) || 0,
+  })).filter((c) => c.name);
+}
+function postWarn() {
+  $("postWarn").textContent = $("sPost").checked
+    ? "Reviews are posted on GitHub under the account `gh` is logged in as."
+    : "Shadow mode: the bot only logs which PR it would review. Use ./review.sh … --dry-run to preview a review.";
+}
+function collectSettings() {
+  const engine = (document.querySelector('input[name="engine"]:checked') || {}).value || cfg.settings.engine;
+  const models = {};
+  document.querySelectorAll("[data-model]").forEach((el) => (models[el.dataset.model] = el.value.trim()));
+  return {
+    ...cfg.settings, engine, models, repos: readRepoRows(),
+    post_comments: $("sPost").checked,
+    max_turns: Number($("sTurns").value), review_timeout: Number($("sTimeout").value),
+    log_retention_days: Number($("sRetention").value),
+    skip: { label: $("sLabel").value.trim(), drafts: $("sDrafts").checked, bots: $("sBots").checked,
+            authors: $("sAuthors").value.split(",").map((a) => a.trim()).filter(Boolean) },
+    compare: readCompareRows(),
+  };
+}
+
+$("settings").addEventListener("click", async (e) => {
+  const t = e.target;
+  if (t.dataset.test) {
+    e.preventDefault();
+    const m = $("test-" + t.dataset.test);
+    m.className = "msg"; m.textContent = "testing… (up to 90s)"; t.disabled = true;
+    try { setMsg(m, await post("/api/test", { engine: t.dataset.test })); } catch (err) { setMsg(m, { ok: false, error: err.message }); }
+    t.disabled = false;
+  } else if (t.dataset.savekey || t.dataset.delkey) {
+    const k = t.dataset.savekey || t.dataset.delkey;
+    const v = t.dataset.savekey ? document.querySelector('[data-key="' + k + '"]').value.trim() : "";
+    if (t.dataset.savekey && !v) return;
+    const res = await post("/api/keys", { [k]: v });
+    setMsg($("keyMsg"), res);
+    if (res.ok) await loadSettings(), setMsg($("keyMsg"), res);
+  } else if (t.dataset.delrepo) {
+    const rows = readRepoRows(); rows.splice(Number(t.dataset.delrepo), 1); renderRepoRows(rows);
+  } else if (t.dataset.delcmp) {
+    const rows = readCompareRows(); rows.splice(Number(t.dataset.delcmp), 1); renderCompareRows(rows);
+  }
+});
+$("settings").addEventListener("change", (e) => {
+  if (e.target.name === "engine") document.querySelectorAll(".engine").forEach((el) => el.classList.toggle("sel", el.dataset.engine === e.target.value));
+  if (e.target.id === "sPost") postWarn();
+});
+$("addRepo").addEventListener("click", () => { const rows = readRepoRows(); rows.push({ repo: "", path: "", rules: "" }); renderRepoRows(rows); });
+$("addCompare").addEventListener("click", () => { const rows = readCompareRows(); rows.push({ name: "", seat_usd: 0 }); renderCompareRows(rows); });
+$("saveSettings").addEventListener("click", async () => {
+  const res = await post("/api/settings", collectSettings());
+  setMsg($("settingsMsg"), res);
+  if (res.ok) { await loadSettings(); setMsg($("settingsMsg"), res); refresh(); }
+});
+function openSettings(open) {
+  $("settings").classList.toggle("open", open);
+  $("toggleSettings").textContent = open ? "✕ Close settings" : "⚙ Settings";
+  if (open) loadSettings().catch((e) => setMsg($("settingsMsg"), { ok: false, error: e.message }));
+}
+$("toggleSettings").addEventListener("click", () => openSettings(!$("settings").classList.contains("open")));
+$("closeSettings").addEventListener("click", () => openSettings(false));
+if (location.hash === "#settings") openSettings(true);
+
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, 10000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>

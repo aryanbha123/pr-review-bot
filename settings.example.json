@@ -1,0 +1,30 @@
+{
+  "repos": [],
+  "engine": "claude",
+  "models": {
+    "claude": "claude-opus-5-5",
+    "codex": "",
+    "gemini": ""
+  },
+  "post_comments": false,
+  "max_turns": 80,
+  "review_timeout": 1200,
+  "skip": {
+    "label": "no-review",
+    "drafts": true,
+    "bots": true,
+    "authors": []
+  },
+  "trivial_globs": [
+    "*.md", "*.mdx", "*.txt", "*.rst", "docs/*", "*/docs/*", "LICENSE*", "CHANGELOG*",
+    "yarn.lock", "*/yarn.lock", "package-lock.json", "*/package-lock.json",
+    "pnpm-lock.yaml", "*/pnpm-lock.yaml", "go.sum", "*/go.sum", "*.lock"
+  ],
+  "log_retention_days": 7,
+  "compare": [
+    { "name": "CodeRabbit Advanced", "seat_usd": 72 },
+    { "name": "CodeRabbit Team", "seat_usd": 48 },
+    { "name": "CodeRabbit Essentials", "seat_usd": 24 },
+    { "name": "Greptile Pro", "seat_usd": 30 }
+  ]
+}

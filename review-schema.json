@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "issues"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["LGTM", "NEEDS_CHANGES", "BLOCKING"] },
+    "summary": { "type": "string" },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "category", "file", "line", "title", "detail", "fix"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["critical", "major", "minor"] },
+          "category": { "type": "string", "enum": ["bug", "security", "performance", "tests", "conventions"] },
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 0 },
+          "title": { "type": "string" },
+          "detail": { "type": "string" },
+          "fix": { "type": "string" }
+        }
+      }
+    }
+  }
+}
